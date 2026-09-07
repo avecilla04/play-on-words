@@ -1,110 +1,161 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import Link from "next/link";
+import { FormEvent, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 
-export function LoginForm({
-  className,
-  ...props
-}: React.ComponentPropsWithoutRef<"div">) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+import { createClient } from "@/lib/supabase/client";
+
+function translateAuthError(message: string) {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("invalid login credentials")) {
+    return "El correo electrónico o la contraseña no son correctos.";
+  }
+
+  if (normalized.includes("email not confirmed")) {
+    return "Debes confirmar tu correo electrónico antes de iniciar sesión.";
+  }
+
+  if (normalized.includes("too many requests")) {
+    return "Demasiados intentos. Espera unos minutos y vuelve a intentarlo.";
+  }
+
+  return "No se ha podido iniciar sesión. Comprueba tus datos.";
+}
+
+export function LoginForm() {
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const supabase = createClient();
-    setIsLoading(true);
-    setError(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw error;
-      // Update this route to redirect to an authenticated route. The user already has an active session.
-      router.push("/protected");
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
-    } finally {
-      setIsLoading(false);
+  const [isPending, startTransition] = useTransition();
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setErrorMessage("");
+
+    if (!email.trim() || !password) {
+      setErrorMessage(
+        "Introduce tu correo electrónico y tu contraseña."
+      );
+      return;
     }
-  };
+
+    startTransition(async () => {
+      const supabase = createClient();
+
+      const { error } =
+        await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+
+      if (error) {
+        setErrorMessage(
+          translateAuthError(error.message)
+        );
+        return;
+      }
+
+      router.push("/protected");
+      router.refresh();
+    });
+  }
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>
-            Enter your email below to login to your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin}>
-            <div className="flex flex-col gap-6">
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/auth/forgot-password"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </Link>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Login"}
-              </Button>
-            </div>
-            <div className="mt-4 text-center text-sm">
-              Don&apos;t have an account?{" "}
-              <Link
-                href="/auth/sign-up"
-                className="underline underline-offset-4"
-              >
-                Sign up
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-5"
+    >
+      {/* Email */}
+
+      <div>
+        <label
+          htmlFor="email"
+          className="mb-2 block text-sm font-semibold text-slate-700"
+        >
+          Correo electrónico
+        </label>
+
+        <input
+          id="email"
+          type="email"
+          value={email}
+          onChange={(event) =>
+            setEmail(event.target.value)
+          }
+          placeholder="tu@email.com"
+          autoComplete="email"
+          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-900/5"
+        />
+      </div>
+
+      {/* Contraseña */}
+
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <label
+            htmlFor="password"
+            className="text-sm font-semibold text-slate-700"
+          >
+            Contraseña
+          </label>
+
+          <Link
+            href="/auth/forgot-password"
+            className="text-xs font-medium text-slate-500 hover:text-slate-900"
+          >
+            ¿Has olvidado tu contraseña?
+          </Link>
+        </div>
+
+        <input
+          id="password"
+          type="password"
+          value={password}
+          onChange={(event) =>
+            setPassword(event.target.value)
+          }
+          autoComplete="current-password"
+          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-900/5"
+        />
+      </div>
+
+      {/* Error */}
+
+      {errorMessage && (
+        <div className="rounded-2xl bg-red-50 p-4 text-sm font-medium text-red-700">
+          ✕ {errorMessage}
+        </div>
+      )}
+
+      {/* Login */}
+
+      <button
+        type="submit"
+        disabled={isPending}
+        className="w-full rounded-2xl bg-slate-900 px-5 py-4 font-bold text-white transition hover:bg-slate-800 disabled:opacity-50"
+      >
+        {isPending
+          ? "Iniciando sesión..."
+          : "INICIAR SESIÓN"}
+      </button>
+
+      {/* Registro */}
+
+      <p className="text-center text-sm text-slate-500">
+        ¿Todavía no tienes una cuenta?{" "}
+        <Link
+          href="/auth/sign-up"
+          className="font-semibold text-slate-900 hover:underline"
+        >
+          Crear cuenta
+        </Link>
+      </p>
+    </form>
   );
 }
