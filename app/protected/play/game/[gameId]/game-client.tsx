@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import {
   FormEvent,
+  useEffect,
   useRef,
   useState,
   useTransition,
@@ -12,9 +13,13 @@ import {
 
 import {
   completeGame,
-  recordAnswer,
+  saveAnswer,
   startReviewGame,
 } from "../../actions";
+
+// ============================================================
+// TIPOS
+// ============================================================
 
 type GameWord = {
   id: string;
@@ -30,6 +35,52 @@ type Feedback = {
   isCorrect: boolean;
   correctAnswers: string[];
 };
+
+type SavePayload = {
+  gameId: string;
+  wordId: string;
+  position: number;
+  direction: Direction;
+  promptText: string;
+  userAnswer: string;
+  correctAnswers: string[];
+  isCorrect: boolean;
+};
+
+// ============================================================
+// NORMALIZAR RESPUESTAS
+// ============================================================
+//
+// Ignora:
+// - mayúsculas / minúsculas
+// - á, é, í, ó, ú
+// - ü
+//
+// Mantiene la ñ como letra diferente.
+//
+// Ejemplos:
+// CASA = casa
+// automóvil = automovil
+//
+// Pero:
+// beautiful != beatiful
+// ============================================================
+
+function normalizeAnswer(text: string) {
+  return text
+    .trim()
+    .toLowerCase()
+    .replaceAll("á", "a")
+    .replaceAll("é", "e")
+    .replaceAll("í", "i")
+    .replaceAll("ó", "o")
+    .replaceAll("ú", "u")
+    .replaceAll("ü", "u");
+}
+
+// ============================================================
+// PRONUNCIACIÓN
+// ============================================================
 
 function speakEnglish(word: string) {
   if (
@@ -51,6 +102,10 @@ function speakEnglish(word: string) {
     utterance
   );
 }
+
+// ============================================================
+// COMPONENTE
+// ============================================================
 
 export default function GameClient({
   gameId,
@@ -76,6 +131,20 @@ export default function GameClient({
   const inputRef =
     useRef<HTMLInputElement>(null);
 
+  // Evita que un doble clic pueda registrar dos veces
+  // la misma respuesta antes de que React actualice la pantalla.
+  const answerLockedRef =
+    useRef(false);
+
+  // Promesas de guardado que se están ejecutando
+  // en segundo plano.
+  const pendingSaves =
+    useRef<Promise<boolean>[]>([]);
+
+  // Respuestas que no hayan podido sincronizarse.
+  const failedSaves =
+    useRef<SavePayload[]>([]);
+
   const [index, setIndex] =
     useState(0);
 
@@ -100,11 +169,116 @@ export default function GameClient({
   const [errorMessage, setErrorMessage] =
     useState("");
 
+  const [syncWarning, setSyncWarning] =
+    useState("");
+
   const [isPending, startTransition] =
     useTransition();
 
   const currentWord =
     words[index];
+
+  // ============================================================
+  // PRECARGAR VOCES DEL DISPOSITIVO
+  // ============================================================
+
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      !("speechSynthesis" in window)
+    ) {
+      return;
+    }
+
+    window.speechSynthesis.getVoices();
+
+    const loadVoices = () => {
+      window.speechSynthesis.getVoices();
+    };
+
+    window.speechSynthesis.addEventListener(
+      "voiceschanged",
+      loadVoices
+    );
+
+    return () => {
+      window.speechSynthesis.removeEventListener(
+        "voiceschanged",
+        loadVoices
+      );
+    };
+  }, []);
+
+  // ============================================================
+  // INTENTAR GUARDAR UNA RESPUESTA
+  // ============================================================
+
+  async function trySave(
+    payload: SavePayload
+  ) {
+    try {
+      return await saveAnswer(payload);
+    } catch (error) {
+      console.error(
+        "Error de sincronización:",
+        error
+      );
+
+      return {
+        success: false,
+        message:
+          "No se pudo sincronizar la respuesta.",
+      };
+    }
+  }
+
+  // ============================================================
+  // GUARDADO EN SEGUNDO PLANO
+  // ============================================================
+
+  function queueSave(
+    payload: SavePayload
+  ) {
+    const promise = (async () => {
+      // Primer intento
+
+      let result =
+        await trySave(payload);
+
+      // Si falla, esperamos medio segundo
+      // y hacemos un segundo intento automáticamente.
+
+      if (!result.success) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, 500)
+        );
+
+        result =
+          await trySave(payload);
+      }
+
+      // Si vuelve a fallar, guardamos la respuesta
+      // en una cola para intentarlo al finalizar.
+
+      if (!result.success) {
+        failedSaves.current.push(
+          payload
+        );
+
+        setSyncWarning(
+          "Hay respuestas pendientes de sincronizar."
+        );
+
+        return false;
+      }
+
+      return true;
+    })();
+
+    pendingSaves.current.push(
+      promise
+    );
+  }
 
   // ============================================================
   // REPASAR ERRORES
@@ -150,9 +324,11 @@ export default function GameClient({
           );
 
     return (
-      <main className="min-h-screen bg-slate-50 px-5 py-10">
-        <div className="mx-auto max-w-md">
-          <div className="rounded-3xl border border-slate-200 bg-white p-7 text-center shadow-sm">
+      <main className="app-shell bg-slate-50">
+        <div className="mx-auto w-full max-w-md">
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-7">
+
             <div className="text-4xl">
               🎉
             </div>
@@ -170,6 +346,7 @@ export default function GameClient({
             </p>
 
             <div className="mt-8 grid grid-cols-2 gap-3">
+
               <div className="rounded-2xl bg-green-50 p-5">
                 <div className="text-3xl font-bold text-green-700">
                   {correct}
@@ -189,6 +366,7 @@ export default function GameClient({
                   Errores
                 </div>
               </div>
+
             </div>
 
             <p className="mt-6 text-sm text-slate-500">
@@ -207,7 +385,9 @@ export default function GameClient({
               {incorrect > 0 && (
                 <button
                   type="button"
-                  onClick={handleReviewErrors}
+                  onClick={
+                    handleReviewErrors
+                  }
                   disabled={isPending}
                   className="w-full rounded-2xl bg-amber-500 px-5 py-4 font-bold text-white disabled:opacity-50"
                 >
@@ -234,15 +414,18 @@ export default function GameClient({
               >
                 INICIO
               </Link>
+
             </div>
+
           </div>
+
         </div>
       </main>
     );
   }
 
   // ============================================================
-  // PALABRA QUE APARECERÁ
+  // DATOS DE LA PALABRA ACTUAL
   // ============================================================
 
   const promptText =
@@ -250,11 +433,16 @@ export default function GameClient({
       ? currentWord.english
       : currentWord.translations[0];
 
+  const correctAnswers =
+    direction === "en_to_es"
+      ? currentWord.translations
+      : [currentWord.english];
+
   const currentNumber =
     answeredBefore + index + 1;
 
   // ============================================================
-  // COMPROBAR RESPUESTA
+  // COMPROBAR RESPUESTA LOCALMENTE
   // ============================================================
 
   function handleSubmit(
@@ -262,9 +450,19 @@ export default function GameClient({
   ) {
     event.preventDefault();
 
-    if (feedback) return;
+    // Evitar doble envío.
 
-    if (!answer.trim()) {
+    if (
+      feedback ||
+      answerLockedRef.current
+    ) {
+      return;
+    }
+
+    const cleanAnswer =
+      answer.trim();
+
+    if (!cleanAnswer) {
       setErrorMessage(
         "Escribe una respuesta."
       );
@@ -272,50 +470,159 @@ export default function GameClient({
       return;
     }
 
+    answerLockedRef.current = true;
+
     setErrorMessage("");
 
-    startTransition(async () => {
-      const result =
-        await recordAnswer({
-          gameId,
-          wordId: currentWord.id,
-          position:
-            answeredBefore +
-            index +
-            1,
-          promptText,
-          userAnswer: answer,
-        });
+    // ------------------------------------------------
+    // CORRECCIÓN LOCAL
+    // ------------------------------------------------
 
-      if (
-        !result.success ||
-        result.isCorrect === undefined
-      ) {
+    const normalizedUserAnswer =
+      normalizeAnswer(cleanAnswer);
+
+    const isCorrect =
+      correctAnswers.some(
+        (correctAnswer) =>
+          normalizeAnswer(
+            correctAnswer
+          ) ===
+          normalizedUserAnswer
+      );
+
+    // ------------------------------------------------
+    // MOSTRAR RESULTADO INMEDIATAMENTE
+    // ------------------------------------------------
+
+    setFeedback({
+      isCorrect,
+      correctAnswers,
+    });
+
+    if (isCorrect) {
+      setCorrect(
+        (current) => current + 1
+      );
+    } else {
+      setIncorrect(
+        (current) => current + 1
+      );
+    }
+
+    // ------------------------------------------------
+    // SINCRONIZAR EN SEGUNDO PLANO
+    // ------------------------------------------------
+
+    queueSave({
+      gameId,
+      wordId: currentWord.id,
+
+      position:
+        answeredBefore +
+        index +
+        1,
+
+      direction,
+
+      promptText,
+
+      userAnswer:
+        cleanAnswer,
+
+      correctAnswers,
+
+      isCorrect,
+    });
+  }
+
+  // ============================================================
+  // FINALIZAR PARTIDA
+  // ============================================================
+
+  async function finishGame() {
+    setErrorMessage("");
+
+    // ------------------------------------------------
+    // ESPERAR LOS GUARDADOS EN SEGUNDO PLANO
+    // ------------------------------------------------
+
+    try {
+      await Promise.all(
+        pendingSaves.current
+      );
+    } catch (error) {
+      console.error(
+        "Error esperando sincronización:",
+        error
+      );
+    }
+
+    // ------------------------------------------------
+    // REINTENTAR RESPUESTAS QUE HAYAN FALLADO
+    // ------------------------------------------------
+
+    if (
+      failedSaves.current.length > 0
+    ) {
+      const retryPayloads = [
+        ...failedSaves.current,
+      ];
+
+      failedSaves.current = [];
+
+      const retryResults =
+        await Promise.all(
+          retryPayloads.map(
+            async (payload) =>
+              await trySave(payload)
+          )
+        );
+
+      const stillFailed =
+        retryResults.some(
+          (result) =>
+            !result.success
+        );
+
+      if (stillFailed) {
+        // Guardamos de nuevo las que sigan fallando.
+
+        retryResults.forEach(
+          (result, index) => {
+            if (!result.success) {
+              failedSaves.current.push(
+                retryPayloads[index]
+              );
+            }
+          }
+        );
+
         setErrorMessage(
-          result.message
+          "No se han podido sincronizar todas las respuestas. Comprueba tu conexión y vuelve a pulsar VER RESULTADO."
         );
 
         return;
       }
+    }
 
-      setFeedback({
-        isCorrect:
-          result.isCorrect,
+    setSyncWarning("");
 
-        correctAnswers:
-          result.correctAnswers ?? [],
-      });
+    // ------------------------------------------------
+    // FINALIZAR PARTIDA EN SUPABASE
+    // ------------------------------------------------
 
-      if (result.isCorrect) {
-        setCorrect(
-          (current) => current + 1
-        );
-      } else {
-        setIncorrect(
-          (current) => current + 1
-        );
-      }
-    });
+    const result =
+      await completeGame(gameId);
+
+    if (!result.success) {
+      setErrorMessage(
+        "No se pudo finalizar la partida."
+      );
+
+      return;
+    }
+
+    setFinished(true);
   }
 
   // ============================================================
@@ -326,24 +633,25 @@ export default function GameClient({
     const isLast =
       index >= words.length - 1;
 
+    // ------------------------------------------------
+    // ÚLTIMA PALABRA
+    // ------------------------------------------------
+
     if (isLast) {
       startTransition(async () => {
-        const result =
-          await completeGame(gameId);
-
-        if (!result.success) {
-          setErrorMessage(
-            "No se pudo finalizar la partida."
-          );
-
-          return;
-        }
-
-        setFinished(true);
+        await finishGame();
       });
 
       return;
     }
+
+    // ------------------------------------------------
+    // SIGUIENTE PALABRA
+    // ------------------------------------------------
+    //
+    // Esto es completamente local.
+    // No necesitamos consultar Supabase.
+    // ------------------------------------------------
 
     setIndex(
       (current) => current + 1
@@ -353,9 +661,11 @@ export default function GameClient({
     setFeedback(null);
     setErrorMessage("");
 
+    answerLockedRef.current = false;
+
     setTimeout(() => {
       inputRef.current?.focus();
-    }, 50);
+    }, 30);
   }
 
   // ============================================================
@@ -364,9 +674,13 @@ export default function GameClient({
 
   return (
     <main className="app-shell bg-slate-50">
+
       <div className="mx-auto w-full max-w-md">
 
+        {/* CABECERA */}
+
         <div className="mb-5 flex items-center justify-between">
+
           <Link
             href="/protected"
             className="text-sm font-medium text-slate-500"
@@ -378,13 +692,15 @@ export default function GameClient({
             {currentNumber} /{" "}
             {totalWords}
           </span>
+
         </div>
 
-        {/* Barra de progreso */}
+        {/* BARRA DE PROGRESO */}
 
         <div className="mb-4 h-2 overflow-hidden rounded-full bg-slate-200">
+
           <div
-            className="h-full bg-slate-900 transition-all"
+            className="h-full bg-slate-900 transition-all duration-300"
             style={{
               width: `${Math.min(
                 100,
@@ -394,7 +710,10 @@ export default function GameClient({
               )}%`,
             }}
           />
+
         </div>
+
+        {/* TARJETA PRINCIPAL */}
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
 
@@ -408,9 +727,10 @@ export default function GameClient({
             {promptText}
           </h1>
 
-          {/* Pronunciación */}
+          {/* PRONUNCIACIÓN */}
 
           <div className="mt-5 text-center">
+
             <button
               type="button"
               onClick={() =>
@@ -418,18 +738,20 @@ export default function GameClient({
                   currentWord.english
                 )
               }
-              className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
+              className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600 transition active:scale-95"
             >
               🔊 Escuchar
             </button>
+
           </div>
 
-          {/* Respuesta */}
+          {/* RESPUESTA */}
 
           <form
             onSubmit={handleSubmit}
-            className="mt-8"
+            className="mt-7"
           >
+
             <label
               htmlFor="game-answer"
               className="mb-2 block text-sm font-semibold text-slate-700"
@@ -443,8 +765,7 @@ export default function GameClient({
               type="text"
               value={answer}
               disabled={
-                Boolean(feedback) ||
-                isPending
+                Boolean(feedback)
               }
               onChange={(event) =>
                 setAnswer(
@@ -466,29 +787,30 @@ export default function GameClient({
             {!feedback && (
               <button
                 type="submit"
-                disabled={isPending}
-                className="mt-5 w-full rounded-2xl bg-slate-900 px-5 py-4 font-bold text-white disabled:opacity-50"
+                className="mt-5 w-full rounded-2xl bg-slate-900 px-5 py-4 font-bold text-white transition active:scale-[0.99]"
               >
-                {isPending
-                  ? "Comprobando..."
-                  : "COMPROBAR"}
+                COMPROBAR
               </button>
             )}
+
           </form>
 
-          {/* Resultado de la palabra */}
+          {/* RESULTADO */}
 
           {feedback && (
             <div className="mt-6">
 
               {feedback.isCorrect ? (
                 <div className="rounded-2xl bg-green-50 p-5 text-center">
+
                   <div className="text-2xl font-bold text-green-700">
                     ✓ CORRECTO
                   </div>
+
                 </div>
               ) : (
                 <div className="rounded-2xl bg-red-50 p-5 text-center">
+
                   <div className="text-2xl font-bold text-red-700">
                     ✕ ERROR
                   </div>
@@ -502,6 +824,7 @@ export default function GameClient({
                       " / "
                     )}
                   </p>
+
                 </div>
               )}
 
@@ -509,21 +832,25 @@ export default function GameClient({
                 type="button"
                 onClick={handleNext}
                 disabled={isPending}
-                className="mt-5 w-full rounded-2xl bg-slate-900 px-5 py-4 font-bold text-white disabled:opacity-50"
+                className="mt-5 w-full rounded-2xl bg-slate-900 px-5 py-4 font-bold text-white transition active:scale-[0.99] disabled:opacity-50"
               >
-                {currentNumber ===
-                totalWords
-                  ? "VER RESULTADO"
-                  : "SIGUIENTE PALABRA"}
+                {isPending
+                  ? "Guardando..."
+                  : currentNumber ===
+                    totalWords
+                    ? "VER RESULTADO"
+                    : "SIGUIENTE PALABRA"}
               </button>
 
             </div>
           )}
+
         </section>
 
-        {/* Marcador */}
+        {/* MARCADOR */}
 
         <div className="mt-5 flex justify-center gap-6 text-sm">
+
           <span className="font-semibold text-green-700">
             ✓ {correct}
           </span>
@@ -531,9 +858,19 @@ export default function GameClient({
           <span className="font-semibold text-red-700">
             ✕ {incorrect}
           </span>
+
         </div>
 
+        {/* AVISO DE SINCRONIZACIÓN */}
+
+        {syncWarning && (
+          <p className="mt-3 text-center text-xs text-amber-600">
+            {syncWarning}
+          </p>
+        )}
+
       </div>
+
     </main>
   );
 }

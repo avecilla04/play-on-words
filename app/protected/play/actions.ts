@@ -2,6 +2,10 @@
 
 import { createClient } from "@/lib/supabase/server";
 
+// ============================================================
+// TIPOS
+// ============================================================
+
 type Direction = "en_to_es" | "es_to_en";
 
 type StartGameInput = {
@@ -15,32 +19,21 @@ type StartGameResult = {
   gameId?: string;
 };
 
-type AnswerInput = {
+type SaveAnswerInput = {
   gameId: string;
   wordId: string;
   position: number;
+  direction: Direction;
   promptText: string;
   userAnswer: string;
+  correctAnswers: string[];
+  isCorrect: boolean;
 };
 
-type AnswerResult = {
+type SaveAnswerResult = {
   success: boolean;
   message: string;
-  isCorrect?: boolean;
-  correctAnswers?: string[];
 };
-
-function normalizeText(text: string) {
-  return text
-    .trim()
-    .toLowerCase()
-    .replaceAll("á", "a")
-    .replaceAll("é", "e")
-    .replaceAll("í", "i")
-    .replaceAll("ó", "o")
-    .replaceAll("ú", "u")
-    .replaceAll("ü", "u");
-}
 
 // ============================================================
 // CREAR UNA PARTIDA
@@ -150,6 +143,10 @@ export async function startGame(
     totalWords = count ?? 0;
   }
 
+  // ------------------------------------------------
+  // COMPROBAR QUE HAY PALABRAS
+  // ------------------------------------------------
+
   if (totalWords === 0) {
     return {
       success: false,
@@ -200,10 +197,17 @@ export async function startGame(
 // ============================================================
 // GUARDAR RESPUESTA
 // ============================================================
+//
+// La comprobación CORRECTO / ERROR ya se realiza
+// directamente en el dispositivo.
+//
+// Esta función únicamente guarda el resultado
+// en Supabase en segundo plano.
+// ============================================================
 
-export async function recordAnswer(
-  input: AnswerInput
-): Promise<AnswerResult> {
+export async function saveAnswer(
+  input: SaveAnswerInput
+): Promise<SaveAnswerResult> {
   const supabase = await createClient();
 
   const {
@@ -217,185 +221,62 @@ export async function recordAnswer(
     };
   }
 
-  const answer = input.userAnswer.trim();
+  const userAnswer =
+    input.userAnswer.trim();
 
-  if (!answer) {
+  if (!userAnswer) {
     return {
       success: false,
-      message: "Escribe una respuesta.",
+      message: "La respuesta está vacía.",
     };
   }
 
   // ------------------------------------------------
-  // Comprobar la partida
+  // GUARDAR RESPUESTA
+  // ------------------------------------------------
+  //
+  // game_id + position es UNIQUE en nuestra BD.
+  //
+  // El upsert evita problemas si por cualquier motivo
+  // se intenta guardar dos veces la misma posición.
   // ------------------------------------------------
 
-  const { data: game } = await supabase
-    .from("games")
-    .select("id, direction, status")
-    .eq("id", input.gameId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!game) {
-    return {
-      success: false,
-      message: "No se encontró la partida.",
-    };
-  }
-
-  if (game.status !== "in_progress") {
-    return {
-      success: false,
-      message: "Esta partida ya ha terminado.",
-    };
-  }
-
-  // ------------------------------------------------
-  // Evitar doble respuesta en una misma posición
-  // ------------------------------------------------
-
-  const { data: previousAnswer } = await supabase
+  const { error } = await supabase
     .from("game_answers")
-    .select(
-      "is_correct, correct_answers"
-    )
-    .eq("game_id", input.gameId)
-    .eq("position", input.position)
-    .eq("user_id", user.id)
-    .maybeSingle();
+    .upsert(
+      {
+        user_id: user.id,
+        game_id: input.gameId,
+        word_id: input.wordId,
+        position: input.position,
+        direction: input.direction,
+        prompt_text: input.promptText,
+        user_answer: userAnswer,
+        correct_answers: input.correctAnswers,
+        is_correct: input.isCorrect,
+      },
+      {
+        onConflict: "game_id,position",
+        ignoreDuplicates: true,
+      }
+    );
 
-  if (previousAnswer) {
-    return {
-      success: true,
-      message: "Respuesta ya registrada.",
-      isCorrect: previousAnswer.is_correct,
-      correctAnswers:
-        previousAnswer.correct_answers ?? [],
-    };
-  }
-
-  // ------------------------------------------------
-  // Obtener palabra inglesa
-  // ------------------------------------------------
-
-  const { data: word, error: wordError } =
-    await supabase
-      .from("words")
-      .select("id, english")
-      .eq("id", input.wordId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-  if (wordError || !word) {
-    return {
-      success: false,
-      message: "No se encontró la palabra.",
-    };
-  }
-
-  // ------------------------------------------------
-  // Obtener traducciones
-  // ------------------------------------------------
-
-  const { data: translations, error: translationsError } =
-    await supabase
-      .from("word_translations")
-      .select("spanish")
-      .eq("word_id", word.id)
-      .eq("user_id", user.id);
-
-  if (translationsError) {
-    console.error(translationsError);
+  if (error) {
+    console.error(
+      "Error guardando respuesta:",
+      error
+    );
 
     return {
       success: false,
       message:
-        "No se pudieron comprobar las traducciones.",
+        "No se pudo sincronizar la respuesta.",
     };
   }
-
-  let correctAnswers: string[] = [];
-
-  if (game.direction === "en_to_es") {
-    correctAnswers = (translations ?? []).map(
-      (translation) => translation.spanish
-    );
-  } else {
-    correctAnswers = [word.english];
-  }
-
-  const normalizedAnswer = normalizeText(answer);
-
-  const isCorrect = correctAnswers.some(
-    (correctAnswer) =>
-      normalizeText(correctAnswer) ===
-      normalizedAnswer
-  );
-
-  // ------------------------------------------------
-  // Guardar respuesta
-  // ------------------------------------------------
-
-  const { error: answerError } = await supabase
-    .from("game_answers")
-    .insert({
-      user_id: user.id,
-      game_id: input.gameId,
-      word_id: word.id,
-      position: input.position,
-      direction: game.direction,
-      prompt_text: input.promptText,
-      user_answer: answer,
-      correct_answers: correctAnswers,
-      is_correct: isCorrect,
-    });
-
-  if (answerError) {
-    console.error(answerError);
-
-    return {
-      success: false,
-      message: "No se pudo guardar tu respuesta.",
-    };
-  }
-
-  // ------------------------------------------------
-  // Actualizar estadísticas de la partida
-  // ------------------------------------------------
-
-  const { data: gameAnswers } = await supabase
-    .from("game_answers")
-    .select("is_correct")
-    .eq("game_id", input.gameId)
-    .eq("user_id", user.id);
-
-  const correctCount =
-    (gameAnswers ?? []).filter(
-      (item) => item.is_correct
-    ).length;
-
-  const incorrectCount =
-    (gameAnswers ?? []).filter(
-      (item) => !item.is_correct
-    ).length;
-
-  await supabase
-    .from("games")
-    .update({
-      correct_answers: correctCount,
-      incorrect_answers: incorrectCount,
-    })
-    .eq("id", input.gameId)
-    .eq("user_id", user.id);
 
   return {
     success: true,
-    message: isCorrect
-      ? "Correcto."
-      : "Respuesta incorrecta.",
-    isCorrect,
-    correctAnswers,
+    message: "Respuesta guardada.",
   };
 }
 
@@ -418,11 +299,28 @@ export async function completeGame(
     };
   }
 
-  const { data: answers } = await supabase
-    .from("game_answers")
-    .select("is_correct")
-    .eq("game_id", gameId)
-    .eq("user_id", user.id);
+  // ------------------------------------------------
+  // LEER TODAS LAS RESPUESTAS UNA SOLA VEZ
+  // ------------------------------------------------
+
+  const { data: answers, error: answersError } =
+    await supabase
+      .from("game_answers")
+      .select("is_correct")
+      .eq("game_id", gameId)
+      .eq("user_id", user.id);
+
+  if (answersError) {
+    console.error(answersError);
+
+    return {
+      success: false,
+    };
+  }
+
+  // ------------------------------------------------
+  // CALCULAR RESULTADO FINAL
+  // ------------------------------------------------
 
   const correct =
     (answers ?? []).filter(
@@ -434,13 +332,18 @@ export async function completeGame(
       (answer) => !answer.is_correct
     ).length;
 
+  // ------------------------------------------------
+  // GUARDAR RESULTADO FINAL
+  // ------------------------------------------------
+
   const { error } = await supabase
     .from("games")
     .update({
       correct_answers: correct,
       incorrect_answers: incorrect,
       status: "completed",
-      completed_at: new Date().toISOString(),
+      completed_at:
+        new Date().toISOString(),
     })
     .eq("id", gameId)
     .eq("user_id", user.id);
@@ -481,18 +384,23 @@ export async function startReviewGame(
   }
 
   // ------------------------------------------------
-  // Obtener la partida original
+  // OBTENER LA PARTIDA ORIGINAL
   // ------------------------------------------------
 
-  const { data: sourceGame, error: sourceGameError } =
-    await supabase
-      .from("games")
-      .select("id, direction")
-      .eq("id", sourceGameId)
-      .eq("user_id", user.id)
-      .maybeSingle();
+  const {
+    data: sourceGame,
+    error: sourceGameError,
+  } = await supabase
+    .from("games")
+    .select("id, direction")
+    .eq("id", sourceGameId)
+    .eq("user_id", user.id)
+    .maybeSingle();
 
-  if (sourceGameError || !sourceGame) {
+  if (
+    sourceGameError ||
+    !sourceGame
+  ) {
     return {
       success: false,
       message: "No se encontró la partida.",
@@ -500,73 +408,109 @@ export async function startReviewGame(
   }
 
   // ------------------------------------------------
-  // Obtener únicamente las palabras falladas
+  // OBTENER ÚNICAMENTE LAS PALABRAS FALLADAS
   // ------------------------------------------------
 
-  const { data: failedAnswers, error: failedAnswersError } =
-    await supabase
-      .from("game_answers")
-      .select("word_id")
-      .eq("game_id", sourceGameId)
-      .eq("user_id", user.id)
-      .eq("is_correct", false)
-      .not("word_id", "is", null);
+  const {
+    data: failedAnswers,
+    error: failedAnswersError,
+  } = await supabase
+    .from("game_answers")
+    .select("word_id")
+    .eq("game_id", sourceGameId)
+    .eq("user_id", user.id)
+    .eq("is_correct", false)
+    .not("word_id", "is", null);
 
   if (failedAnswersError) {
-    console.error(failedAnswersError);
+    console.error(
+      failedAnswersError
+    );
 
     return {
       success: false,
-      message: "No se pudieron cargar los errores.",
+      message:
+        "No se pudieron cargar los errores.",
     };
   }
 
-  const failedWordIds = Array.from(
-    new Set(
-      (failedAnswers ?? [])
-        .map((answer) => answer.word_id)
-        .filter(
-          (wordId): wordId is string =>
-            Boolean(wordId)
-        )
-    )
-  );
+  // Evitar palabras repetidas
 
-  if (failedWordIds.length === 0) {
+  const failedWordIds =
+    Array.from(
+      new Set(
+        (failedAnswers ?? [])
+          .map(
+            (answer) =>
+              answer.word_id
+          )
+          .filter(
+            (
+              wordId
+            ): wordId is string =>
+              Boolean(wordId)
+          )
+      )
+    );
+
+  if (
+    failedWordIds.length === 0
+  ) {
     return {
       success: false,
-      message: "No tienes errores que repasar.",
+      message:
+        "No tienes errores que repasar.",
     };
   }
 
   // ------------------------------------------------
-  // Crear nueva partida de repaso
+  // CREAR NUEVA PARTIDA DE REPASO
   // ------------------------------------------------
 
-  const { data: reviewGame, error: reviewGameError } =
-    await supabase
-      .from("games")
-      .insert({
-        user_id: user.id,
-        direction: sourceGame.direction,
-        scope: "review_errors",
-        source_game_id: sourceGameId,
-        category_id: null,
-        category_name: null,
-        total_words: failedWordIds.length,
-        correct_answers: 0,
-        incorrect_answers: 0,
-        status: "in_progress",
-      })
-      .select("id")
-      .single();
+  const {
+    data: reviewGame,
+    error: reviewGameError,
+  } = await supabase
+    .from("games")
+    .insert({
+      user_id: user.id,
 
-  if (reviewGameError || !reviewGame) {
-    console.error(reviewGameError);
+      direction:
+        sourceGame.direction,
+
+      scope: "review_errors",
+
+      source_game_id:
+        sourceGameId,
+
+      category_id: null,
+
+      category_name: null,
+
+      total_words:
+        failedWordIds.length,
+
+      correct_answers: 0,
+
+      incorrect_answers: 0,
+
+      status: "in_progress",
+    })
+    .select("id")
+    .single();
+
+  if (
+    reviewGameError ||
+    !reviewGame
+  ) {
+    console.error(
+      reviewGameError
+    );
 
     return {
       success: false,
-      message: "No se pudo iniciar el repaso.",
+      message:
+        "No se pudo iniciar el repaso.",
     };
   }
 
