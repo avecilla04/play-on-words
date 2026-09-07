@@ -10,9 +10,26 @@ const defaultUrl = process.env.VERCEL_URL
   : "http://localhost:3000";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(defaultUrl),
-  title: "Next.js and Supabase Starter Kit",
-  description: "The fastest way to build apps with Next.js and Supabase",
+
+  metadataBase: new URL("https://play-on-words.vercel.app"),
+  
+  title: {
+    default: "Play on Words",
+    template: "%s | Play on Words",
+  },
+  description:
+    "Practica diariamente tu vocabulario de inglés y español.",
+  applicationName: "Play on Words",
+
+  appleWebApp: {
+    capable: true,
+    title: "Play on Words",
+    statusBarStyle: "default",
+  },
+
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 const geistSans = Geist({
