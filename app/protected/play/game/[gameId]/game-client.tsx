@@ -363,10 +363,10 @@ export default function GameClient({
   // ============================================================
 
   return (
-    <main className="min-h-screen bg-slate-50 px-5 py-8">
-      <div className="mx-auto max-w-md">
+    <main className="app-shell bg-slate-50">
+      <div className="mx-auto w-full max-w-md">
 
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-5 flex items-center justify-between">
           <Link
             href="/protected"
             className="text-sm font-medium text-slate-500"
@@ -382,7 +382,7 @@ export default function GameClient({
 
         {/* Barra de progreso */}
 
-        <div className="mb-5 h-2 overflow-hidden rounded-full bg-slate-200">
+        <div className="mb-4 h-2 overflow-hidden rounded-full bg-slate-200">
           <div
             className="h-full bg-slate-900 transition-all"
             style={{
@@ -396,7 +396,7 @@ export default function GameClient({
           />
         </div>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
 
           <p className="text-center text-xs font-semibold uppercase tracking-widest text-slate-400">
             {direction === "en_to_es"
@@ -404,7 +404,7 @@ export default function GameClient({
               : "Traduce al inglés"}
           </p>
 
-          <h1 className="mt-8 text-center text-4xl font-bold text-slate-900">
+          <h1 className="mt-6 break-words text-center text-3xl font-bold text-slate-900 sm:text-4xl">
             {promptText}
           </h1>
 
@@ -454,7 +454,7 @@ export default function GameClient({
               autoComplete="off"
               autoCapitalize="none"
               autoFocus
-              className="w-full rounded-2xl border border-slate-300 px-4 py-4 text-lg outline-none focus:border-slate-900 disabled:bg-slate-50"
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3.5 text-base outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-900/5 disabled:bg-slate-50"
             />
 
             {errorMessage && (

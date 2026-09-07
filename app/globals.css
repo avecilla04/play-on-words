@@ -66,3 +66,36 @@
     @apply bg-background text-foreground;
   }
 }
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow-x: hidden;
+  background: #f8fafc;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Contenedor principal adaptado a iPhone / PWA */
+.app-shell {
+  width: 100%;
+  min-height: 100dvh;
+
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+
+/* Evita el zoom automático de iOS al escribir */
+input,
+textarea,
+select {
+  font-size: 16px;
+}

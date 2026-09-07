@@ -17,12 +17,12 @@ export default async function ProtectedPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-5 py-8">
-      <div className="mx-auto max-w-md">
+    <main className="app-shell bg-slate-50">
+      <div className="mx-auto w-full max-w-md">
 
         {/* Cabecera */}
 
-        <header className="mb-8">
+        <header className="mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Image
@@ -58,7 +58,7 @@ export default async function ProtectedPage() {
 
         {/* Mensaje */}
 
-        <section className="mb-7 rounded-3xl bg-slate-900 p-6 text-white shadow-sm">
+        <section className="mb-5 rounded-3xl bg-slate-900 p-5 sm:p-6 text-white shadow-sm">
           <p className="text-sm font-medium text-slate-300">
             Tu vocabulario
           </p>
