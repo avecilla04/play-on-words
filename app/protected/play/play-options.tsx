@@ -1,16 +1,25 @@
 "use client";
 
 import {
+  useEffect,
   useState,
   useTransition,
 } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startGame } from "./actions";
 
 type Category = {
   id: string;
   name: string;
+  wordCount: number;
 };
+
+const SESSION_SIZES = [10, 20, 30, 50] as const;
+
+type SessionSize = (typeof SESSION_SIZES)[number] | "all";
+
+const SESSION_SIZE_KEY = "pow-session-size";
 
 type Direction =
   | "en_to_es"
@@ -36,6 +45,53 @@ export default function PlayOptions({
 
   const [message, setMessage] =
     useState("");
+
+  const [sessionSize, setSessionSize] =
+    useState<SessionSize>(20);
+
+  // Recordar el último tamaño de partida elegido.
+  useEffect(() => {
+    try {
+      const stored =
+        window.localStorage.getItem(SESSION_SIZE_KEY);
+
+      if (stored === "all") {
+        setSessionSize("all");
+      } else if (
+        SESSION_SIZES.includes(
+          Number(stored) as (typeof SESSION_SIZES)[number]
+        )
+      ) {
+        setSessionSize(
+          Number(stored) as (typeof SESSION_SIZES)[number]
+        );
+      }
+    } catch {
+      // localStorage no disponible
+    }
+  }, []);
+
+  function chooseSessionSize(size: SessionSize) {
+    setSessionSize(size);
+
+    try {
+      window.localStorage.setItem(
+        SESSION_SIZE_KEY,
+        String(size)
+      );
+    } catch {
+      // localStorage no disponible
+    }
+  }
+
+  const selectedCategory = categories.find(
+    (category) => category.id === categoryId
+  );
+
+  const availableWords =
+    scope === "category"
+      ? selectedCategory?.wordCount ?? 0
+      : totalWords;
 
   const [isPending, startTransition] =
     useTransition();
@@ -67,6 +123,10 @@ export default function PlayOptions({
           scope === "category"
             ? categoryId
             : null,
+        limit:
+          sessionSize === "all"
+            ? null
+            : sessionSize,
       });
 
       if (
@@ -221,7 +281,7 @@ export default function PlayOptions({
                       key={category.id}
                       value={category.id}
                     >
-                      {category.name}
+                      {`${category.name} (${category.wordCount})`}
                     </option>
                   )
                 )}
@@ -230,6 +290,57 @@ export default function PlayOptions({
           </div>
         )}
       </section>
+
+      <section>
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
+          ¿Cuántas palabras?
+        </h2>
+
+        <div className="grid grid-cols-5 gap-2">
+          {[...SESSION_SIZES, "all" as const].map(
+            (size) => (
+              <button
+                key={size}
+                type="button"
+                onClick={() =>
+                  chooseSessionSize(size)
+                }
+                className={`rounded-xl border py-3 text-sm font-bold transition ${
+                  sessionSize === size
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-200 bg-white text-slate-700"
+                }`}
+              >
+                {size === "all" ? "Todas" : size}
+              </button>
+            )
+          )}
+        </div>
+
+        <p className="mt-2 text-xs text-slate-500">
+          {availableWords > 0
+            ? `Se elegirán ${
+                sessionSize === "all"
+                  ? availableWords
+                  : Math.min(
+                      sessionSize,
+                      availableWords
+                    )
+              } palabras al azar de ${availableWords} disponibles.`
+            : scope === "category" && !categoryId
+              ? "Elige una categoría."
+              : "No hay palabras disponibles."}
+        </p>
+      </section>
+
+      {totalWords === 0 && (
+        <Link
+          href="/protected/packs"
+          className="block rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+        >
+          🎓 Tu bolsa está vacía. <span className="font-semibold underline">Añade el pack B2</span> para empezar a practicar.
+        </Link>
+      )}
 
       {message && (
         <div className="rounded-xl bg-red-50 p-4 text-sm font-medium text-red-700">

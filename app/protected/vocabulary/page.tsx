@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import VocabularyClient from "./vocabulary-client";
 
 type TranslationRow = {
@@ -30,44 +31,48 @@ export default async function VocabularyPage() {
     redirect("/auth/login");
   }
 
-  const { data: words } = await supabase
-    .from("words")
-    .select("id, english")
-    .order("english");
+  // Se lee todo por páginas: con el pack B2 hay más de
+  // 1000 palabras y Supabase devuelve como máximo 1000 filas.
+  const [words, categories, translations, categoryLinks] =
+    await Promise.all([
+      fetchAll<{ id: string; english: string }>((from, to) =>
+        supabase
+          .from("words")
+          .select("id, english")
+          .eq("user_id", user.id)
+          .order("english")
+          .order("id")
+          .range(from, to)
+      ),
+      fetchAll<Category>((from, to) =>
+        supabase
+          .from("categories")
+          .select("id, name")
+          .eq("user_id", user.id)
+          .order("name")
+          .range(from, to)
+      ),
+      fetchAll<TranslationRow>((from, to) =>
+        supabase
+          .from("word_translations")
+          .select("id, word_id, spanish")
+          .eq("user_id", user.id)
+          .order("spanish")
+          .order("id")
+          .range(from, to)
+      ),
+      fetchAll<CategoryLink>((from, to) =>
+        supabase
+          .from("word_categories")
+          .select("word_id, category_id")
+          .eq("user_id", user.id)
+          .order("word_id")
+          .order("category_id")
+          .range(from, to)
+      ),
+    ]);
 
-  const { data: categories } = await supabase
-    .from("categories")
-    .select("id, name")
-    .order("name");
-
-  const wordIds = (words ?? []).map(
-    (word) => word.id
-  );
-
-  let translations: TranslationRow[] = [];
-  let categoryLinks: CategoryLink[] = [];
-
-  if (wordIds.length > 0) {
-    const { data: translationData } = await supabase
-      .from("word_translations")
-      .select("id, word_id, spanish")
-      .in("word_id", wordIds)
-      .order("spanish");
-
-    translations =
-      (translationData as TranslationRow[] | null) ?? [];
-
-    const { data: categoryLinkData } = await supabase
-      .from("word_categories")
-      .select("word_id, category_id")
-      .in("word_id", wordIds);
-
-    categoryLinks =
-      (categoryLinkData as CategoryLink[] | null) ?? [];
-  }
-
-  const categoryList =
-    (categories as Category[] | null) ?? [];
+  const categoryList = categories;
 
   const categoryById = new Map(
     categoryList.map((category) => [
@@ -110,7 +115,7 @@ export default async function VocabularyPage() {
     categoryIdsByWord.set(link.word_id, current);
   }
 
-  const vocabulary = (words ?? []).map((word) => {
+  const vocabulary = words.map((word) => {
     const categoryIds =
       categoryIdsByWord.get(word.id) ?? [];
 

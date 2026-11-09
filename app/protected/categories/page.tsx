@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import CategoriesClient from "./categories-client";
 
 type Category = {
@@ -30,16 +31,19 @@ export default async function CategoriesPage() {
     .eq("user_id", user.id)
     .order("name");
 
-  const { data: linksData } = await supabase
-    .from("word_categories")
-    .select("category_id")
-    .eq("user_id", user.id);
+  const linksData = await fetchAll<CategoryLink>((from, to) =>
+    supabase
+      .from("word_categories")
+      .select("category_id")
+      .eq("user_id", user.id)
+      .order("category_id")
+      .range(from, to)
+  ).catch(() => []);
 
   const categories =
     (categoriesData as Category[] | null) ?? [];
 
-  const links =
-    (linksData as CategoryLink[] | null) ?? [];
+  const links = linksData;
 
   const counts = new Map<string, number>();
 

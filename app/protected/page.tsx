@@ -83,6 +83,25 @@ export default async function ProtectedPage() {
 
         <div className="space-y-3">
           <Link
+            href="/protected/packs"
+            className="flex items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm transition hover:bg-amber-100"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-xl">
+              🎓
+            </div>
+
+            <div>
+              <p className="font-semibold text-slate-900">
+                Pack B2 · Aptis y Cambridge
+              </p>
+
+              <p className="mt-0.5 text-sm text-slate-600">
+                +1.200 palabras, conectores y phrasal verbs
+              </p>
+            </div>
+          </Link>
+
+          <Link
             href="/protected/add-word"
             className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:bg-slate-50"
           >

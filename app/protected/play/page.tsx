@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import PlayOptions from "./play-options";
 
 export default async function PlayPage() {
@@ -18,6 +19,25 @@ export default async function PlayPage() {
     .from("categories")
     .select("id, name")
     .order("name");
+
+  const links = await fetchAll<{ category_id: string }>(
+    (from, to) =>
+      supabase
+        .from("word_categories")
+        .select("category_id")
+        .eq("user_id", user.id)
+        .order("category_id")
+        .range(from, to)
+  ).catch(() => []);
+
+  const wordCountByCategory = new Map<string, number>();
+
+  for (const link of links) {
+    wordCountByCategory.set(
+      link.category_id,
+      (wordCountByCategory.get(link.category_id) ?? 0) + 1
+    );
+  }
 
   const { count } = await supabase
     .from("words")
@@ -48,7 +68,11 @@ export default async function PlayPage() {
         </header>
 
         <PlayOptions
-          categories={categories ?? []}
+          categories={(categories ?? []).map((category) => ({
+            ...category,
+            wordCount:
+              wordCountByCategory.get(category.id) ?? 0,
+          }))}
           totalWords={count ?? 0}
         />
       </div>

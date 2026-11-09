@@ -72,6 +72,11 @@ export default function VocabularyClient({
   const router = useRouter();
 
   const [search, setSearch] = useState("");
+
+  // Con más de 1000 palabras pintarlas todas de golpe
+  // hace la página lenta en el móvil: se muestran por tandas.
+  const PAGE = 60;
+  const [visibleCount, setVisibleCount] = useState(PAGE);
   const [editingWord, setEditingWord] =
     useState<VocabularyWord | null>(null);
 
@@ -147,9 +152,10 @@ export default function VocabularyClient({
         <input
           type="search"
           value={search}
-          onChange={(event) =>
-            setSearch(event.target.value)
-          }
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setVisibleCount(PAGE);
+          }}
           placeholder="Buscar palabra, traducción o categoría..."
           className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 outline-none transition focus:border-slate-900"
         />
@@ -199,6 +205,13 @@ export default function VocabularyClient({
           >
             + Añadir palabra
           </Link>
+
+          <Link
+            href="/protected/packs"
+            className="mt-3 block text-sm font-semibold text-amber-700 underline"
+          >
+            o añade el pack B2 (+1.200 palabras)
+          </Link>
         </div>
       ) : filteredWords.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
@@ -208,7 +221,7 @@ export default function VocabularyClient({
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredWords.map((word) => (
+          {filteredWords.slice(0, visibleCount).map((word) => (
             <article
               key={word.id}
               className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
@@ -282,6 +295,18 @@ export default function VocabularyClient({
               </div>
             </article>
           ))}
+
+          {filteredWords.length > visibleCount && (
+            <button
+              type="button"
+              onClick={() =>
+                setVisibleCount((current) => current + PAGE)
+              }
+              className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-sm font-semibold text-slate-700"
+            >
+              Mostrar más ({filteredWords.length - visibleCount} restantes)
+            </button>
+          )}
         </div>
       )}
 

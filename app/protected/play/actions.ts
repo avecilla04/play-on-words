@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 // ============================================================
 // TIPOS
@@ -11,6 +12,9 @@ type Direction = "en_to_es" | "es_to_en";
 type StartGameInput = {
   direction: Direction;
   categoryId?: string | null;
+  // Número máximo de palabras de la partida.
+  // null / undefined = todas.
+  limit?: number | null;
 };
 
 type StartGameResult = {
@@ -95,14 +99,20 @@ export async function startGame(
 
     categoryName = category.name;
 
-    const { data: links, error: linksError } =
-      await supabase
-        .from("word_categories")
-        .select("word_id")
-        .eq("user_id", user.id)
-        .eq("category_id", categoryId);
+    let links: { word_id: string }[] = [];
 
-    if (linksError) {
+    try {
+      links = await fetchAll<{ word_id: string }>(
+        (from, to) =>
+          supabase
+            .from("word_categories")
+            .select("word_id")
+            .eq("user_id", user.id)
+            .eq("category_id", categoryId)
+            .order("word_id")
+            .range(from, to)
+      );
+    } catch (linksError) {
       console.error(linksError);
 
       return {
@@ -113,7 +123,7 @@ export async function startGame(
     }
 
     totalWords = new Set(
-      (links ?? []).map((link) => link.word_id)
+      links.map((link) => link.word_id)
     ).size;
   }
 
@@ -155,6 +165,21 @@ export async function startGame(
           ? "Esta categoría todavía no tiene palabras."
           : "Tu bolsa de palabras está vacía.",
     };
+  }
+
+  // ------------------------------------------------
+  // TAMAÑO DE LA PARTIDA
+  // ------------------------------------------------
+
+  if (
+    typeof input.limit === "number" &&
+    Number.isFinite(input.limit) &&
+    input.limit > 0
+  ) {
+    totalWords = Math.min(
+      totalWords,
+      Math.floor(input.limit)
+    );
   }
 
   // ------------------------------------------------
