@@ -125,7 +125,7 @@ export default async function ProtectedPage() {
             className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:bg-slate-50"
           >
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-xl">
-              
+              📖
             </div>
 
             <div>
@@ -144,7 +144,7 @@ export default async function ProtectedPage() {
             className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:bg-slate-50"
           >
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-xl">
-              🏷
+              🗂️
             </div>
 
             <div>

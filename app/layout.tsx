@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Nunito } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   },
 };
 
-const geistSans = Geist({
+const geistSans = Nunito({
   variable: "--font-geist-sans",
   display: "swap",
   subsets: ["latin"],

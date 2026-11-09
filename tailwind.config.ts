@@ -11,6 +11,19 @@ export default {
   theme: {
     extend: {
       colors: {
+        slate: {
+          50: "#f6f5ff",
+          100: "#eceafd",
+          200: "#dcd8f7",
+          300: "#bdb7e6",
+          400: "#8f88c2",
+          500: "#6b6599",
+          600: "#524c7d",
+          700: "#3f3966",
+          800: "#2c2752",
+          900: "#1e1b4b",
+          950: "#120f33",
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
