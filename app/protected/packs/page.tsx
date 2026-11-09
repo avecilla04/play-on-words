@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import {
   B2_PACK,
@@ -15,9 +15,7 @@ export const maxDuration = 60;
 export default async function PacksPage() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) {
     redirect("/auth/login");

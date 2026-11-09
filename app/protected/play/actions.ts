@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 
 // ============================================================
@@ -48,9 +48,7 @@ export async function startGame(
 ): Promise<StartGameResult> {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) {
     return {
@@ -235,9 +233,7 @@ export async function saveAnswer(
 ): Promise<SaveAnswerResult> {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) {
     return {
@@ -314,9 +310,7 @@ export async function completeGame(
 ) {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) {
     return {
@@ -397,9 +391,7 @@ export async function startReviewGame(
 ): Promise<StartGameResult> {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) {
     return {

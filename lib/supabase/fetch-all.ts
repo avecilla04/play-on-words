@@ -14,6 +14,7 @@
 // ============================================================
 
 const PAGE_SIZE = 1000;
+const PARALLEL_PAGES = 3;
 
 type PageResult<T> = PromiseLike<{
   data: T[] | null;
@@ -25,21 +26,28 @@ export async function fetchAll<T>(
 ): Promise<T[]> {
   const rows: T[] = [];
 
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await buildQuery(
-      from,
-      from + PAGE_SIZE - 1
+  // Pedimos varias páginas a la vez (en paralelo) en lugar de
+  // una detrás de otra: con 2.000-3.000 filas todo llega en
+  // un solo "viaje" a Supabase.
+  for (let start = 0; ; start += PAGE_SIZE * PARALLEL_PAGES) {
+    const pages = await Promise.all(
+      Array.from({ length: PARALLEL_PAGES }, (_, i) => {
+        const from = start + i * PAGE_SIZE;
+        return buildQuery(from, from + PAGE_SIZE - 1);
+      })
     );
 
-    if (error) {
-      throw new Error(error.message);
-    }
+    for (const { data, error } of pages) {
+      if (error) {
+        throw new Error(error.message);
+      }
 
-    const page = data ?? [];
-    rows.push(...page);
+      const page = data ?? [];
+      rows.push(...page);
 
-    if (page.length < PAGE_SIZE) {
-      return rows;
+      if (page.length < PAGE_SIZE) {
+        return rows;
+      }
     }
   }
 }

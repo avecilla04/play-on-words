@@ -32,3 +32,36 @@ export async function createClient() {
     },
   );
 }
+
+// ============================================================
+// USUARIO ACTUAL (RÁPIDO)
+// ============================================================
+//
+// getUser() hace una petición a los servidores de Supabase
+// en cada llamada. getClaims() valida el token de la sesión
+// directamente en el servidor de la app (sin ese viaje extra)
+// cuando el proyecto usa las nuevas claves de firma de Supabase.
+// El proxy ya refresca la sesión en cada petición.
+// ============================================================
+
+export type AuthUser = {
+  id: string;
+  email: string;
+};
+
+export async function getAuthUser(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<AuthUser | null> {
+  const { data, error } = await supabase.auth.getClaims();
+
+  const claims = data?.claims;
+
+  if (error || !claims?.sub) {
+    return null;
+  }
+
+  return {
+    id: claims.sub,
+    email: typeof claims.email === "string" ? claims.email : "",
+  };
+}

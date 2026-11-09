@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { normalizeAnswer } from "@/lib/answer-matching";
 import GameClient, { type GameWord } from "./game-client";
@@ -37,33 +37,14 @@ export default async function GamePage({ params }: PageProps) {
 
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) {
     redirect("/auth/login");
   }
 
   // ------------------------------------------------
-  // Partida
-  // ------------------------------------------------
-
-  const { data: game } = await supabase
-    .from("games")
-    .select(
-      "id, direction, scope, category_id, source_game_id, total_words, correct_answers, incorrect_answers, status"
-    )
-    .eq("id", gameId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!game) {
-    redirect("/protected/play");
-  }
-
-  // ------------------------------------------------
-  // Palabras y traducciones del usuario
+  // Partida, palabras y traducciones (todo a la vez)
   // ------------------------------------------------
   //
   // Se leen por páginas (Supabase devuelve máx. 1000 filas)
@@ -71,8 +52,16 @@ export default async function GamePage({ params }: PageProps) {
   // con cientos de IDs, que fallan con vocabularios grandes.
   // ------------------------------------------------
 
-  const [allWords, allTranslations, previousAnswersData] =
+  const [gameResult, allWords, allTranslations, previousAnswersData] =
     await Promise.all([
+      supabase
+        .from("games")
+        .select(
+          "id, direction, scope, category_id, source_game_id, total_words, correct_answers, incorrect_answers, status"
+        )
+        .eq("id", gameId)
+        .eq("user_id", user.id)
+        .maybeSingle(),
       fetchAll<Word>((from, to) =>
         supabase
           .from("words")
@@ -95,6 +84,12 @@ export default async function GamePage({ params }: PageProps) {
         .eq("game_id", gameId)
         .eq("user_id", user.id),
     ]);
+
+  const game = gameResult.data;
+
+  if (!game) {
+    redirect("/protected/play");
+  }
 
   const previousAnswers = previousAnswersData.data ?? [];
 

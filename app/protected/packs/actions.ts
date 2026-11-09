@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { chunk, fetchAll } from "@/lib/supabase/fetch-all";
 import {
   B2_PACK,
@@ -45,9 +45,7 @@ export async function importB2Pack(
 ): Promise<ImportResult> {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) {
     return { success: false, message: "Debes iniciar sesión." };

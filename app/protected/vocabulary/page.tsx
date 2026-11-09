@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import VocabularyClient from "./vocabulary-client";
 
@@ -23,9 +23,7 @@ type CategoryLink = {
 export default async function VocabularyPage() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) {
     redirect("/auth/login");

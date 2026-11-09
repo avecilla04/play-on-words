@@ -1,34 +1,45 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import PlayOptions from "./play-options";
 
 export default async function PlayPage() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) {
     redirect("/auth/login");
   }
 
-  const { data: categories } = await supabase
-    .from("categories")
-    .select("id, name")
-    .order("name");
-
-  const links = await fetchAll<{ category_id: string }>(
-    (from, to) =>
+  // Las tres consultas a la vez, no una detrás de otra.
+  const [categoriesResult, links, countResult] =
+    await Promise.all([
       supabase
-        .from("word_categories")
-        .select("category_id")
+        .from("categories")
+        .select("id, name")
         .eq("user_id", user.id)
-        .order("category_id")
-        .range(from, to)
-  ).catch(() => []);
+        .order("name"),
+      fetchAll<{ category_id: string }>((from, to) =>
+        supabase
+          .from("word_categories")
+          .select("category_id")
+          .eq("user_id", user.id)
+          .order("category_id")
+          .range(from, to)
+      ).catch(() => []),
+      supabase
+        .from("words")
+        .select("*", {
+          count: "exact",
+          head: true,
+        })
+        .eq("user_id", user.id),
+    ]);
+
+  const categories = categoriesResult.data;
+  const count = countResult.count;
 
   const wordCountByCategory = new Map<string, number>();
 
@@ -38,14 +49,6 @@ export default async function PlayPage() {
       (wordCountByCategory.get(link.category_id) ?? 0) + 1
     );
   }
-
-  const { count } = await supabase
-    .from("words")
-    .select("*", {
-      count: "exact",
-      head: true,
-    })
-    .eq("user_id", user.id);
 
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-8">
