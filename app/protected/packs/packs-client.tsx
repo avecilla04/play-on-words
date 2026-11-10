@@ -1,5 +1,6 @@
 "use client";
 
+import { IconPlay } from "@/components/icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -212,22 +213,10 @@ export default function PacksClient({
           {result.success && (
             <Link
               href="/protected/play"
-              className="mt-3 block rounded-xl bg-green-700 px-4 py-3 text-center font-bold text-white"
+              className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-green-700 px-4 py-3 text-center font-bold text-white"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#ffffff"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M7 4v16l13 -8z" />
-              </svg>
-               Practicar ahora
+              <IconPlay />
+              Practicar ahora
             </Link>
           )}
         </div>

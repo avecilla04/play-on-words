@@ -1,3 +1,4 @@
+import { IconArrowLeft, IconPlus } from "@/components/icons";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
@@ -142,45 +143,18 @@ export default async function VocabularyPage() {
         <div className="mb-8 flex items-center justify-between">
           <Link
             href="/protected"
-            className="text-sm font-medium text-slate-500"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#ffffff"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M5 12l14 0" />
-              <path d="M5 12l4 4" />
-              <path d="M5 12l4 -4" />
-            </svg>
-             Volver
+            <IconArrowLeft />
+            Volver
           </Link>
 
           <Link
             href="/protected/add-word"
-            className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#ffffff"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 5l0 14" />
-              <path d="M5 12l14 0" />
-            </svg> 
-             Añadir
+            <IconPlus />
+            Añadir
           </Link>
         </div>
 
