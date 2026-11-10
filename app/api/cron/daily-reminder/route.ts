@@ -17,7 +17,6 @@ import { computeStreak, dayKey } from "@/lib/streak";
 //   CRON_SECRET          → contraseña que Vercel envía al llamar
 // ============================================================
 
-export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 function reminderFor(streak: number) {
