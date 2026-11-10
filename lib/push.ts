@@ -1,4 +1,4 @@
-import webpush from "web-push";
+import * as webpush from "web-push";
 
 // ============================================================
 // ENVÍO DE NOTIFICACIONES PUSH (solo en el servidor)
