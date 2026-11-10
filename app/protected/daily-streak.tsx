@@ -1,6 +1,7 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { computeStreak } from "@/lib/streak";
 import NotificationToggle from "./notification-toggle";
+import { IconChecklist } from "@/components/icons";
 
 // ============================================================
 // TARJETA DE RACHA DIARIA (pantalla de inicio)
@@ -28,13 +29,15 @@ export default async function DailyStreak() {
     <section className="mb-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div
-            className={`flex h-12 w-12 items-center justify-center rounded-2xl text-2xl ${
-              streak.current > 0 ? "bg-orange-50" : "bg-slate-100 grayscale"
-            }`}
-          >
-            🔥
-          </div>
+            <div
+              className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+                streak.current > 0
+                  ? "bg-orange-50 text-orange-500"
+                  : "bg-slate-100 text-slate-400"
+              }`}
+            >
+              <IconChecklist size={26} />
+            </div>
 
           <div>
             <p className="text-2xl font-bold leading-none text-slate-900">

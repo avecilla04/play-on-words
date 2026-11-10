@@ -6,6 +6,7 @@ import {
   useTransition,
 } from "react";
 import Link from "next/link";
+import { IconCategory, IconWorld } from "@/components/icons";
 import { useRouter } from "next/navigation";
 import { startGame } from "./actions";
 
@@ -224,8 +225,9 @@ export default function PlayOptions({
                 : "border-slate-200 bg-white"
             }`}
           >
-            <div className="font-semibold text-slate-900">
-              🌐 Toda la bolsa
+            <div className="flex items-center gap-2 font-semibold text-slate-900">
+              <IconWorld size={18} />
+              Toda la bolsa
             </div>
 
             <div className="mt-1 text-sm text-slate-500">
@@ -247,8 +249,9 @@ export default function PlayOptions({
                 : "border-slate-200 bg-white"
             }`}
           >
-            <div className="font-semibold text-slate-900">
-              🏷 Elegir categoría
+            <div className="flex items-center gap-2 font-semibold text-slate-900">
+              <IconCategory size={18} />
+              Elegir categoría
             </div>
           </button>
         </div>
