@@ -2,6 +2,7 @@
 
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { dayKey } from "@/lib/streak";
 
 // ============================================================
 // TIPOS
@@ -262,7 +263,10 @@ export async function saveAnswer(
   // se intenta guardar dos veces la misma posición.
   // ------------------------------------------------
 
-  const { error } = await supabase
+  // Se guardan a la vez la respuesta y el día practicado
+  // (para la racha diaria), así no se añade espera.
+  const [{ error }, practiceResult] = await Promise.all([
+    supabase
     .from("game_answers")
     .upsert(
       {
@@ -280,7 +284,22 @@ export async function saveAnswer(
         onConflict: "game_id,position",
         ignoreDuplicates: true,
       }
+    ),
+    supabase
+      .from("practice_days")
+      .upsert(
+        { user_id: user.id, day: dayKey() },
+        { onConflict: "user_id,day", ignoreDuplicates: true }
+      ),
+  ]);
+
+  // Si falla la racha no pasa nada: la respuesta sí cuenta.
+  if (practiceResult.error) {
+    console.error(
+      "Error guardando el día de práctica:",
+      practiceResult.error
     );
+  }
 
   if (error) {
     console.error(

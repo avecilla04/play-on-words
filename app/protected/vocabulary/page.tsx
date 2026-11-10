@@ -144,14 +144,43 @@ export default async function VocabularyPage() {
             href="/protected"
             className="text-sm font-medium text-slate-500"
           >
-            ← Volver
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#ffffff"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 12l14 0" />
+              <path d="M5 12l4 4" />
+              <path d="M5 12l4 -4" />
+            </svg>
+             Volver
           </Link>
 
           <Link
             href="/protected/add-word"
             className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
           >
-            + Añadir
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#ffffff"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 5l0 14" />
+              <path d="M5 12l14 0" />
+            </svg> 
+             Añadir
           </Link>
         </div>
 
